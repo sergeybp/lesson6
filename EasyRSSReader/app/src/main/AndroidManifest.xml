@@ -20,6 +20,11 @@
         </activity>
         <activity android:name=".SingleArticle"></activity>
         <activity android:name=".ChanShow"></activity>
+        <provider
+            android:name=".MyContentProvider"
+            android:authorities="ru.sergeybudkov.easyrssreader.feeds"
+            android:enabled="true">
+        </provider>
 
     </application>
 

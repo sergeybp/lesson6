@@ -1,29 +1,34 @@
 package easyrssreader.sergeybudkov.ru.easyrssreader;
 
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.LoaderManager;
+import android.content.ContentValues;
+import android.content.CursorLoader;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.Loader;
 import android.database.Cursor;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CursorAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.SimpleCursorAdapter;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.util.ArrayList;
-
-public class MainActivity extends Activity {
+@TargetApi(Build.VERSION_CODES.HONEYCOMB)
+public class MainActivity extends Activity implements LoaderManager.LoaderCallbacks<Cursor> {
 
     EditText newRSS;
     Button addRSS;
     ListView listView;
-    DataBase cBase;
-    String[] finalChans;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -33,22 +38,23 @@ public class MainActivity extends Activity {
         newRSS = (EditText) findViewById(R.id.newChan);
         newRSS.setText("http://");
         listView = (ListView) findViewById(R.id.channels);
-        cBase = new DataBase(this);
-        cBase.open();
-        baseLoad();
+        listView.setAdapter(new SimpleCursorAdapter(this, android.R.layout.simple_list_item_1, null, new String[]{"url"}, new int[]{android.R.id.text1}, 0));
+        getLoaderManager().initLoader(0, null, this);
+
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View itemClicked, int position,
                                     long id) {
+                final long x = id;
                 final String s = (String) ((TextView) itemClicked).getText();
                 AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
                 builder.setTitle("Вы выбрали:")
                         .setMessage(s)
-                        .setCancelable(false)
+                        .setCancelable(true)
                         .setNegativeButton("Удалить",
                                 new DialogInterface.OnClickListener() {
                                     public void onClick(DialogInterface dialog, int id) {
-                                        deleteChan(s);
+                                        getContentResolver().delete(Uri.parse("content://ru.sergeybudkov.easyrssreader.feeds/channels"), "" + x, null);
                                         dialog.cancel();
                                     }
                                 })
@@ -67,37 +73,6 @@ public class MainActivity extends Activity {
         });
     }
 
-    public void deleteChan(String name){
-        cBase.deleteChannel(name);
-        for(int  i = 0;i<finalChans.length;i++){
-            if(!finalChans[i].equals(name)){
-                cBase.insertChannel(finalChans[i]);
-            }
-        }
-        baseLoad();
-    }
-
-    public void baseLoad(){
-        Cursor cursor = cBase.sqLiteDatabase.query(DataBase.TABLE_NAME, new String[] {
-                       DataBase.CHANNEL},
-                null,
-                null,
-                null,
-                null,
-                null
-        );
-        ArrayList<String> chans = new ArrayList<String>();
-        while (cursor.moveToNext()) {
-            String channel = cursor.getString(cursor.getColumnIndex(DataBase.CHANNEL));
-            chans.add(channel);
-        }
-        finalChans = new String[chans.size()];
-        for(int i = 0 ; i  < chans.size();i++){
-            finalChans[i] = chans.get(i);
-        }
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,finalChans);
-        listView.setAdapter(adapter);
-    }
 
     public void addChan(View v){
         String name =newRSS.getText().toString();
@@ -108,11 +83,28 @@ public class MainActivity extends Activity {
             toast.show();
             return;
         }
-        cBase.insertChannel(name);
-        baseLoad();
+        ContentValues contentValues = new ContentValues();
+        contentValues.put("url", name);
+        getContentResolver().insert(Uri.parse("content://ru.sergeybudkov.easyrssreader.feeds/channels"), contentValues);
+        //cBase.insertChannel(name);
+        //baseLoad();
     }
 
 
+    @Override
+    public Loader<Cursor> onCreateLoader(int i, Bundle bundle) {
+        return new CursorLoader(this, Uri.parse("content://ru.sergeybudkov.easyrssreader.feeds/channels"), null, null, null, null);
+    }
+
+    @Override
+    public void onLoadFinished(Loader<Cursor> cursorLoader, Cursor cursor) {
+        ((CursorAdapter)listView.getAdapter()).swapCursor(cursor);
+    }
+
+    @Override
+    public void onLoaderReset(Loader<Cursor> cursorLoader) {
+        ((CursorAdapter)listView.getAdapter()).swapCursor(null);
+    }
 }
 
 
